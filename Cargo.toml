@@ -1,0 +1,65 @@
+[package]
+name        = "bruecke"
+version     = "0.1.0"
+edition     = "2021"
+description = "Real-time Python creative coding → WebGPU renderer. Write app.py, see it at 60 fps."
+license     = "MIT"
+repository  = "https://github.com/LEVOGNE/bruecke"
+readme      = "README.md"
+keywords    = ["webgpu", "python", "creative-coding", "wasm", "live-coding"]
+categories  = ["visualization", "wasm", "game-development"]
+
+# Files to exclude from the published crate (example assets, dev tooling)
+exclude = [
+    "dist/",
+    "pkg/",
+    "history/",
+    "static/",
+    "docs/",
+    ".claude/",
+    "cat_*.svg",
+    "hero.svg",
+    "app.py",
+    "log.py",
+    "build.sh",
+    "build.bat",
+    "build-js.sh",
+]
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+name = "bundle"
+path = "src/bin/bundle.rs"
+
+[[bin]]
+name = "server"
+path = "src/bin/server.rs"
+
+[dependencies]
+
+# wasm-bindgen is only needed when compiling to WASM
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen             = "0.2"
+console_error_panic_hook = "0.1"
+rustpython-vm            = { version = "0.4", default-features = false, features = ["freeze-stdlib", "compiler"] }
+serde_json               = "1"
+
+# server dependencies (native only)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio        = { version = "1", features = ["full"] }
+axum         = { version = "0.7", features = ["macros"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+futures-util = "0.3"
+notify       = { version = "6", default-features = false, features = ["macos_fsevent"] }
+reqwest      = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde_json   = "1"
+
+[profile.release]
+opt-level = "s"
+
+# getrandom 0.3.x requires wasm_js feature for wasm32-unknown-unknown
+[target.'cfg(target_arch = "wasm32")'.dependencies.getrandom]
+version  = "0.3"
+features = ["wasm_js"]

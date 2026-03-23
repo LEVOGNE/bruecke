@@ -1,0 +1,26 @@
+# ── Rust build output ─────────────────────────────────────────────────────────
+target/
+
+# ── wasm-pack output (build.rs copies bruecke_bg.wasm → assets/ automatically)
+pkg/
+
+# ── Distribution archive (built by build.sh for GitHub Releases)
+dist/
+
+# ── Runtime files created by the server while it runs
+history/
+bruecke_state.json
+
+# ── Stale / generated directories (safe to delete at any time)
+static/
+docs/plans/
+
+# ── macOS / editors
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Local Claude tooling
+.claude/
