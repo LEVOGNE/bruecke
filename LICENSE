@@ -1,0 +1,75 @@
+                    GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
+
+ Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+                            Preamble
+
+  The GNU Affero General Public License is a free, copyleft license for
+software and other kinds of works, specifically designed to ensure
+cooperation with the community in the case of network server software.
+
+  The licenses for most software and other practical works are designed
+to take away your freedom to share and change the works.  By contrast,
+our General Public Licenses are intended to guarantee your freedom to
+share and change all versions of a program--to make sure it remains free
+software for all its users.
+
+  When we speak of free software, we are referring to freedom, not
+price.  Our General Public Licenses are designed to make sure that you
+have the freedom to distribute copies of free software (and charge for
+them if you wish), that you receive source code or can get it if you
+want it, that you can change the software or use pieces of it in new
+free programs, and that you know you can do these things.
+
+  Specifically, the GNU Affero General Public License is designed to
+ensure that if you use a piece of AGPLv3 software to provide a service
+over a network, you must release the complete source code of the
+combined work to the users of that service.
+
+  Developers that use the GNU GPL protect your rights with two steps:
+(1) assert copyright on the software, and (2) offer you this License
+giving you legal permission to copy, distribute and/or modify it.
+
+  A key concern for AGPLv3 is that the GPL "network loophole" is closed:
+if you run a modified program on a server and let others interact with it
+there, you must release your modified source.  Section 13 of this
+license covers this requirement.
+
+  For the full legal text of the AGPLv3, see:
+  https://www.gnu.org/licenses/agpl-3.0.txt
+
+-------------------------------------------------------------------------------
+
+bruecke — Copyright (C) 2026 bruecke contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+-------------------------------------------------------------------------------
+
+COMMERCIAL LICENSE
+
+If you wish to use bruecke in a proprietary or closed-source product,
+or provide it as a service without releasing your source code under
+the AGPLv3, a commercial license is available.
+
+A commercial license grants you:
+  - The right to integrate bruecke into closed-source software
+  - Freedom from AGPLv3 copyleft obligations
+  - Optional: priority support and custom terms
+
+To obtain a commercial license, open an issue or contact the maintainers
+via the project repository.

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>bruecke — Python → WebGPU at 60 fps</title>
+    <meta name="description" content="Real-time Python creative coding rendered via WebGPU at 60 fps. Write app.py, see it live. AI-native, local-first, no setup.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark:  #0a0f16;
+            --bg-card:  #111827;
+            --bg-code:  #1e293b;
+            --blue:     #3b82f6;
+            --teal:     #14b8a6;
+            --yellow:   #f59e0b;
+            --text:     #f3f4f6;
+            --dim:      #9ca3af;
+            --border:   #1f2937;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark); color: var(--text);
+            line-height: 1.6; overflow-x: hidden;
+        }
+
+        /* ── Nav ── */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 40px;
+            background: rgba(10,15,22,0.88); backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap; gap: 10px;
+        }
+        .nav-logo {
+            font-family: 'Fira Code', monospace; font-size: 1.1rem; font-weight: 500;
+            background: linear-gradient(90deg, var(--blue), var(--teal));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .nav-right { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+        .nav-links { display: flex; gap: 22px; }
+        .nav-links a { color: var(--dim); text-decoration: none; font-size: .88rem; transition: color .2s; }
+        .nav-links a:hover { color: var(--text); }
+
+        /* ── Lang switcher ── */
+        .lang-switcher { display: flex; gap: 4px; flex-wrap: wrap; }
+        .lang-btn {
+            background: none; border: 1px solid transparent; border-radius: 6px;
+            color: var(--dim); font-size: .78rem; padding: 3px 8px; cursor: pointer;
+            transition: color .2s, border-color .2s; font-family: inherit;
+        }
+        .lang-btn:hover { color: var(--text); border-color: var(--border); }
+        .lang-btn.active { color: var(--teal); border-color: var(--teal); }
+
+        /* ── Hero ── */
+        header {
+            min-height: 100vh; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            text-align: center; padding: 120px 20px 60px;
+            background: radial-gradient(ellipse at 50% 40%, #1a2744 0%, var(--bg-dark) 65%);
+        }
+        .hero-badge {
+            display: inline-block; margin-bottom: 1.5rem;
+            padding: 5px 14px; border-radius: 20px;
+            background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.3);
+            font-family: 'Fira Code', monospace; font-size: .78rem; color: var(--blue); letter-spacing: .06em;
+        }
+        h1 {
+            font-size: clamp(3rem, 8vw, 5.5rem); font-weight: 800; letter-spacing: -.02em;
+            background: linear-gradient(120deg, #fff 30%, var(--teal));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1rem;
+        }
+        .tagline { font-size: clamp(1rem, 2.5vw, 1.3rem); color: var(--dim); max-width: 680px; margin-bottom: 2.5rem; }
+        .cta-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+        .btn {
+            padding: 13px 28px; border-radius: 8px; font-weight: 700; font-size: .92rem;
+            text-decoration: none; transition: transform .2s, box-shadow .2s;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary { background: var(--blue); color: #fff; }
+        .btn-secondary { border: 1px solid #374151; color: var(--text); background: transparent; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(59,130,246,.3); }
+
+        .screenshot-wrap {
+            max-width: 860px; margin: 56px auto 0; padding: 0 20px;
+        }
+        .screenshot-wrap img {
+            width: 100%; border-radius: 14px;
+            border: 1px solid var(--border);
+            box-shadow: 0 24px 60px rgba(0,0,0,.7);
+        }
+
+        /* ── Sections ── */
+        section { max-width: 1100px; margin: 100px auto; padding: 0 20px; }
+        h2 { font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 800; text-align: center; margin-bottom: 3rem; }
+        h2 span { background: linear-gradient(90deg, var(--blue), var(--teal)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        /* ── Cards ── */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+        .card {
+            background: var(--bg-card); padding: 2rem; border-radius: 16px;
+            border: 1px solid var(--border); transition: border-color .3s, transform .3s;
+        }
+        .card:hover { border-color: var(--teal); transform: translateY(-4px); }
+        .card-icon { font-size: 2rem; margin-bottom: 1rem; }
+        .card h3 { color: var(--teal); margin-bottom: .6rem; font-size: 1.05rem; }
+        .card p { color: var(--dim); font-size: .93rem; }
+
+        /* ── Code window ── */
+        .code-window {
+            background: var(--bg-code); border-radius: 12px; padding: 22px;
+            font-family: 'Fira Code', monospace; font-size: .85rem; line-height: 1.75;
+            box-shadow: 0 20px 40px rgba(0,0,0,.5); border: 1px solid #334155;
+        }
+        .code-dots { display: flex; gap: 7px; margin-bottom: 16px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+        .d-r{background:#ff5f56} .d-y{background:#ffbd2e} .d-g{background:#27c93f}
+        .c-teal{color:var(--teal)} .c-blue{color:var(--blue)} .c-yellow{color:var(--yellow)}
+        .c-dim{color:#64748b;font-style:italic} .c-str{color:#a3e635}
+
+        /* ── Two-col ── */
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+        .two-col.reverse { direction: rtl; }
+        .two-col.reverse > * { direction: ltr; }
+        .two-col h3 { font-size: 1.5rem; margin-bottom: 1rem; }
+        .two-col p  { color: var(--dim); margin-bottom: .9rem; }
+
+        /* ── Table ── */
+        .table-wrap { overflow-x: auto; margin-top: 2rem; border-radius: 12px; }
+        table { width: 100%; border-collapse: collapse; background: var(--bg-card); }
+        th, td { padding: 13px 18px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: #1e293b; color: var(--yellow); font-size: .82rem; letter-spacing: .06em; text-transform: uppercase; }
+        td:first-child { font-weight: 600; }
+        td:not(:first-child) { color: var(--dim); }
+        tr:last-child td { border-bottom: none; }
+        .yes{color:#4ade80} .no{color:#f87171}
+
+        .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+        footer {
+            text-align: center; padding: 48px 20px;
+            border-top: 1px solid var(--border); color: var(--dim); font-size: .875rem;
+        }
+        footer a { color: var(--blue); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        .footer-links { display: flex; gap: 20px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+
+        /* RTL support */
+        [dir="rtl"] .two-col.reverse { direction: ltr; }
+        [dir="rtl"] th, [dir="rtl"] td { text-align: right; }
+        [dir="rtl"] .nav-links { flex-direction: row-reverse; }
+
+        @media (max-width: 768px) {
+            nav { padding: 12px 16px; }
+            .nav-links { display: none; }
+            .two-col, .two-col.reverse { grid-template-columns: 1fr; direction: ltr; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <span class="nav-logo">bruecke</span>
+    <div class="nav-right">
+        <div class="nav-links">
+            <a href="#features" data-i18n="nav_features">Features</a>
+            <a href="#ai">AI</a>
+            <a href="#api">API</a>
+            <a href="#start" data-i18n="nav_start">Start</a>
+            <a href="https://github.com/LEVOGNE/bruecke">GitHub ↗</a>
+        </div>
+        <div class="lang-switcher">
+            <button class="lang-btn active" onclick="setLang('en')">🇬🇧</button>
+            <button class="lang-btn" onclick="setLang('de')">🇩🇪</button>
+            <button class="lang-btn" onclick="setLang('tr')">🇹🇷</button>
+            <button class="lang-btn" onclick="setLang('es')">🇪🇸</button>
+            <button class="lang-btn" onclick="setLang('fr')">🇫🇷</button>
+            <button class="lang-btn" onclick="setLang('ar')">🇸🇦</button>
+            <button class="lang-btn" onclick="setLang('zh')">🇨🇳</button>
+        </div>
+    </div>
+</nav>
+
+<header>
+    <div class="hero-badge">Python → WebAssembly → WebGPU · 60 fps</div>
+    <h1>bruecke</h1>
+    <p class="tagline" data-i18n="tagline"></p>
+    <div class="cta-row">
+        <a href="https://github.com/LEVOGNE/bruecke/releases" class="btn btn-primary" data-i18n="btn_download"></a>
+        <a href="https://github.com/LEVOGNE/bruecke" class="btn btn-secondary">⭐ GitHub</a>
+        <a href="COMMANDS.md" class="btn btn-secondary">📖 Docs</a>
+    </div>
+    <div class="screenshot-wrap">
+        <img src="logo_04.png" alt="bruecke screenshot">
+    </div>
+</header>
+
+<hr class="divider">
+
+<section id="features">
+    <h2><span data-i18n="features_h2"></span></h2>
+    <div class="grid">
+        <div class="card"><div class="card-icon">⚡</div><h3 data-i18n="f1_title"></h3><p data-i18n="f1_body"></p></div>
+        <div class="card"><div class="card-icon">🎮</div><h3 data-i18n="f2_title"></h3><p data-i18n="f2_body"></p></div>
+        <div class="card"><div class="card-icon">🤖</div><h3 data-i18n="f3_title"></h3><p data-i18n="f3_body"></p></div>
+        <div class="card"><div class="card-icon">📦</div><h3 data-i18n="f4_title"></h3><p data-i18n="f4_body"></p></div>
+        <div class="card"><div class="card-icon">🐍</div><h3 data-i18n="f5_title"></h3><p data-i18n="f5_body"></p></div>
+        <div class="card"><div class="card-icon">🖼️</div><h3 data-i18n="f6_title"></h3><p data-i18n="f6_body"></p></div>
+    </div>
+</section>
+
+<hr class="divider">
+
+<section id="ai">
+    <div class="two-col">
+        <div>
+            <h3 data-i18n="ai_h3"></h3>
+            <p data-i18n="ai_p1"></p>
+            <p data-i18n="ai_p2"></p>
+            <div class="cta-row" style="justify-content:flex-start;margin-top:1.5rem">
+                <a href="https://github.com/LEVOGNE/bruecke" class="btn btn-primary" data-i18n="btn_getstarted"></a>
+            </div>
+        </div>
+        <div class="code-window">
+            <div class="code-dots"><div class="dot d-r"></div><div class="dot d-y"></div><div class="dot d-g"></div></div>
+            <p><span class="c-dim"># <span data-i18n="code_prompt_comment"></span></span></p>
+            <p><span class="c-teal">"<span data-i18n="code_prompt_text"></span>"</span></p>
+            <br>
+            <p><span class="c-dim"># <span data-i18n="code_generated_comment"></span></span></p>
+            <p><span class="c-blue">import</span> math</p>
+            <br>
+            <p>GRAVITY = <span class="c-yellow">0.45</span></p>
+            <p>FLOOR &nbsp; = <span class="c-yellow">560</span></p>
+            <p>knight  = {<span class="c-str">'x'</span>: <span class="c-yellow">400</span>, <span class="c-str">'vy'</span>: <span class="c-yellow">0</span>, <span class="c-str">'ground'</span>: <span class="c-blue">True</span>}</p>
+            <br>
+            <p><span class="c-blue">def</span> <span class="c-yellow">frame</span>(t):</p>
+            <p>&nbsp;&nbsp;knight[<span class="c-str">'vy'</span>] += GRAVITY</p>
+            <p>&nbsp;&nbsp;<span class="c-blue">if</span> keys &amp; <span class="c-yellow">16</span> <span class="c-blue">and</span> knight[<span class="c-str">'ground'</span>]:</p>
+            <p>&nbsp;&nbsp;&nbsp;&nbsp;knight[<span class="c-str">'vy'</span>] = <span class="c-yellow">-11.0</span></p>
+            <p>&nbsp;&nbsp;<span class="c-yellow">image</span>(<span class="c-str">"knight.svg"</span>, knight[<span class="c-str">'x'</span>], knight[<span class="c-str">'y'</span>], <span class="c-yellow">96</span>, <span class="c-yellow">96</span>)</p>
+        </div>
+    </div>
+</section>
+
+<hr class="divider">
+
+<section id="api">
+    <div class="two-col reverse">
+        <div>
+            <h3 data-i18n="api_h3"></h3>
+            <p data-i18n="api_p1"></p>
+            <p data-i18n="api_p2"></p>
+            <a href="COMMANDS.md" class="btn btn-secondary" style="margin-top:1.5rem;display:inline-flex" data-i18n="btn_docs"></a>
+        </div>
+        <div class="code-window">
+            <div class="code-dots"><div class="dot d-r"></div><div class="dot d-y"></div><div class="dot d-g"></div></div>
+            <p><span class="c-blue">import</span> math, random</p>
+            <br>
+            <p><span class="c-dim"># <span data-i18n="code_module_comment"></span></span></p>
+            <p>balls = [(<span class="c-yellow">random.randint</span>(<span class="c-yellow">50</span>,<span class="c-yellow">750</span>), <span class="c-yellow">random.randint</span>(<span class="c-yellow">50</span>,<span class="c-yellow">500</span>))</p>
+            <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-blue">for</span> _ <span class="c-blue">in</span> <span class="c-yellow">range</span>(<span class="c-yellow">20</span>)]</p>
+            <br>
+            <p><span class="c-blue">def</span> <span class="c-yellow">frame</span>(t):</p>
+            <p>&nbsp;&nbsp;<span class="c-yellow">color</span>(<span class="c-yellow">10</span>, <span class="c-yellow">10</span>, <span class="c-yellow">30</span>); <span class="c-yellow">rect</span>(<span class="c-yellow">0</span>, <span class="c-yellow">0</span>, <span class="c-yellow">800</span>, <span class="c-yellow">600</span>)</p>
+            <p>&nbsp;&nbsp;<span class="c-blue">for</span> i, (bx, by) <span class="c-blue">in</span> <span class="c-yellow">enumerate</span>(balls):</p>
+            <p>&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-yellow">color</span>(<span class="c-yellow">80</span> + i*<span class="c-yellow">8</span>, <span class="c-yellow">140</span>, <span class="c-yellow">255</span>)</p>
+            <p>&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-yellow">circle</span>(bx + math.<span class="c-yellow">sin</span>(t+i)*<span class="c-yellow">30</span>, by, <span class="c-yellow">12</span>)</p>
+            <p>&nbsp;&nbsp;<span class="c-yellow">color</span>(<span class="c-yellow">255</span>, <span class="c-yellow">220</span>, <span class="c-yellow">80</span>)</p>
+            <p>&nbsp;&nbsp;<span class="c-yellow">circle</span>(mouse_x, mouse_y, <span class="c-yellow">8</span>)</p>
+        </div>
+    </div>
+</section>
+
+<hr class="divider">
+
+<section id="compare">
+    <h2><span data-i18n="compare_h2"></span></h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th data-i18n="tbl_feature"></th>
+                    <th>bruecke</th>
+                    <th>Pyodide / PyScript</th>
+                    <th>p5.js / Processing</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td data-i18n="tbl_rendering"></td><td><span class="yes">WebGPU · GPU · 60 fps</span></td><td>Canvas 2D / DOM</td><td>Canvas 2D</td></tr>
+                <tr><td data-i18n="tbl_hotreload"></td><td><span class="yes">✅ <span data-i18n="tbl_instant"></span></span></td><td><span class="no">❌ <span data-i18n="tbl_manual"></span></span></td><td><span data-i18n="tbl_partial"></span></td></tr>
+                <tr><td data-i18n="tbl_ai"></td><td><span class="yes">✅ 3 <span data-i18n="tbl_providers"></span></span></td><td><span class="no">❌</span></td><td><span class="no">❌</span></td></tr>
+                <tr><td data-i18n="tbl_offline"></td><td><span class="yes">✅ <span data-i18n="tbl_onebinary"></span></span></td><td>⚠️ CDN</td><td>⚠️ CDN</td></tr>
+                <tr><td data-i18n="tbl_svg"></td><td><span class="yes">✅ <span data-i18n="tbl_native"></span></span></td><td><span data-i18n="tbl_manual"></span></td><td><span class="no">❌</span></td></tr>
+                <tr><td data-i18n="tbl_pip"></td><td><span class="no">❌ stdlib</span></td><td><span class="yes">✅</span></td><td>N/A</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<hr class="divider">
+
+<section id="start">
+    <h2><span data-i18n="start_h2"></span></h2>
+    <div style="max-width:680px;margin:0 auto">
+        <div class="code-window">
+            <div class="code-dots"><div class="dot d-r"></div><div class="dot d-y"></div><div class="dot d-g"></div></div>
+            <p><span class="c-dim"># ── <span data-i18n="start_path_release"></span> ──</span></p>
+            <p><span class="c-dim"># 1. <span data-i18n="start_step1"></span></span></p>
+            <p><span class="c-dim">#    → github.com/LEVOGNE/bruecke/releases</span></p>
+            <p><span class="c-teal">$</span> cd dist && ./server &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-dim"># macOS / Linux</span></p>
+            <p><span class="c-teal">></span> cd dist && server.exe <span class="c-dim"># Windows</span></p>
+            <br>
+            <p><span class="c-dim"># ── <span data-i18n="start_or_build"></span> ──</span></p>
+            <p><span class="c-teal">$</span> git clone github.com/LEVOGNE/bruecke</p>
+            <p><span class="c-teal">$</span> ./build.sh &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-dim"># <span data-i18n="start_build_comment"></span></span></p>
+            <p><span class="c-teal">$</span> cd dist && ./server</p>
+            <br>
+            <p><span class="c-dim"># 2. <span data-i18n="start_step3"></span></span></p>
+            <p><span class="c-teal">→</span> http://127.0.0.1:7777</p>
+            <br>
+            <p><span class="c-dim"># 3. <span data-i18n="start_step4"></span></span></p>
+        </div>
+        <p style="text-align:center;margin-top:2rem;color:var(--dim)">
+            <span data-i18n="start_cargo"></span>: &nbsp;<code style="background:var(--bg-code);padding:4px 10px;border-radius:6px;font-family:'Fira Code',monospace">cargo install bruecke</code>
+        </p>
+        <div class="cta-row" style="margin-top:2rem">
+            <a href="https://github.com/LEVOGNE/bruecke/releases" class="btn btn-primary" data-i18n="btn_download_release"></a>
+            <a href="https://github.com/LEVOGNE/bruecke" class="btn btn-secondary" data-i18n="btn_source"></a>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <p>bruecke &mdash; <span data-i18n="footer_sub"></span></p>
+    <div class="footer-links">
+        <a href="https://github.com/LEVOGNE/bruecke">GitHub</a>
+        <a href="https://crates.io/crates/bruecke">crates.io</a>
+        <a href="COMMANDS.md">Docs</a>
+        <a href="https://github.com/LEVOGNE/bruecke/blob/main/LICENSE">AGPLv3</a>
+    </div>
+    <p style="margin-top:14px">Built with RustPython · WebAssembly · WebGPU · Axum</p>
+</footer>
+
+<script>
+const T = {
+    en: {
+        nav_features: "Features", nav_start: "Start",
+        tagline: "Write Python. Save the file. See it rendered at 60 fps — locally, with AI, no build step, no cloud.",
+        btn_download: "↓ Download", btn_getstarted: "Get started", btn_docs: "📖 Full API Reference",
+        btn_download_release: "↓ Download Release", btn_source: "View Source",
+        features_h2: "Why bruecke?",
+        f1_title: "Instant hot-reload",        f1_body: "Save app.py — the canvas updates in milliseconds. No page reload. No compiler. Works with any editor.",
+        f2_title: "Real WebGPU — 60 fps",      f2_body: "Your Python runs on the GPU via a dedicated WebGPU pipeline with MSAA 4×. Hardware-accelerated rendering.",
+        f3_title: "AI-native prompt loop",     f3_body: "Describe what you want. AI writes Python. bruecke runs it. Supports Claude, GPT-4o, Gemini (free tier).",
+        f4_title: "Zero setup",                f4_body: "One binary, one WASM file, your app.py. No npm. No pip. No Docker. Runs fully offline after download.",
+        f5_title: "Real Python 3",             f5_body: "RustPython compiled to WASM — real Python 3 syntax, import math, import random, classes, closures.",
+        f6_title: "SVG sprites — GPU-sharp",   f6_body: "Drop any .svg, .png, .jpg next to app.py. SVGs rasterised at exact pixel size — crisp at any scale.",
+        ai_h3: "Describe it.\nSee it. Right now.",
+        ai_p1: "Type anything in the prompt bar. The AI outputs only Python code — no markdown, no explanation, just working code. Validated as valid Python before touching your file.",
+        ai_p2: "Use Build On to extend your scene instead of rewriting. Every generation is saved to version history automatically.",
+        api_h3: "Full Python API.\nZero boilerplate.",
+        api_p1: "Draw builtins are always available like print() — no import needed. color(), rect(), circle(), image() — just call them.",
+        api_p2: "Per-frame inputs (mouse_x, mouse_y, keys, t) are injected as globals every frame. Read them directly — no event listeners, no callbacks.",
+        compare_h2: "bruecke vs. the alternatives",
+        tbl_feature: "Feature", tbl_rendering: "Rendering", tbl_hotreload: "Hot-reload",
+        tbl_ai: "AI loop built-in", tbl_offline: "Offline / local-first", tbl_svg: "SVG sprites",
+        tbl_pip: "pip packages", tbl_instant: "Instant on save", tbl_manual: "Manual",
+        tbl_partial: "Partial", tbl_providers: "providers", tbl_onebinary: "One binary", tbl_native: "Native",
+        start_h2: "Start in 30 seconds",
+        start_step1: "Download the release for your OS from GitHub",
+        start_step2: "Start the server",
+        start_step3: "Open in browser",
+        start_path_release: "Option A: Pre-built release (server binary included)",
+        start_step4: "Edit app.py — canvas updates instantly on save",
+        start_or_build: "Option B: Build from source",
+        start_build_comment: "needs Rust + wasm-pack",
+        start_cargo: "Or install via Cargo",
+        footer_sub: "real-time Python → WebGPU renderer",
+        code_prompt_comment: "Your prompt:", code_prompt_text: "a knight with gravity, jumping and SVG sprites",
+        code_generated_comment: "Generated instantly:",
+        code_module_comment: "module-level = runs once",
+    },
+    de: {
+        nav_features: "Features", nav_start: "Start",
+        tagline: "Python schreiben. Datei speichern. Mit 60 fps gerendert sehen — lokal, mit KI, kein Build-Schritt, keine Cloud.",
+        btn_download: "↓ Herunterladen", btn_getstarted: "Loslegen", btn_docs: "📖 API-Referenz",
+        btn_download_release: "↓ Release herunterladen", btn_source: "Quellcode",
+        features_h2: "Warum bruecke?",
+        f1_title: "Sofortiges Hot-Reload",     f1_body: "app.py speichern — der Canvas aktualisiert sich in Millisekunden. Kein Neuladen. Kein Compiler. Funktioniert mit jedem Editor.",
+        f2_title: "Echtes WebGPU — 60 fps",    f2_body: "Dein Python läuft auf der GPU über eine dedizierte WebGPU-Pipeline mit MSAA 4×. Hardware-beschleunigtes Rendering.",
+        f3_title: "KI-nativer Prompt-Loop",    f3_body: "Beschreib, was du willst. Die KI schreibt Python. bruecke führt es aus. Claude, GPT-4o, Gemini (kostenlos) werden unterstützt.",
+        f4_title: "Null Setup",                f4_body: "Eine Binary, eine WASM-Datei, dein app.py. Kein npm. Kein pip. Kein Docker. Läuft vollständig offline.",
+        f5_title: "Echtes Python 3",           f5_body: "RustPython zu WASM kompiliert — echte Python-3-Syntax, import math, import random, Klassen, Closures.",
+        f6_title: "SVG-Sprites — GPU-scharf",  f6_body: "Beliebige .svg, .png, .jpg neben app.py ablegen. SVGs werden in exakter Pixelgröße gerastert — scharf in jeder Skalierung.",
+        ai_h3: "Beschreib es.\nSieh es. Sofort.",
+        ai_p1: "Schreib etwas in die Prompt-Leiste. Die KI gibt nur Python-Code aus — kein Markdown, keine Erklärung, nur funktionierender Code. Wird als gültiges Python validiert, bevor deine Datei berührt wird.",
+        ai_p2: "Mit 'Build On' erweitert die KI deine Szene, anstatt sie neu zu schreiben. Jede Generierung wird automatisch im Versionsverlauf gespeichert.",
+        api_h3: "Volle Python-API.\nNull Boilerplate.",
+        api_p1: "Draw-Builtins sind immer verfügbar wie print() — kein Import nötig. color(), rect(), circle(), image() — einfach aufrufen.",
+        api_p2: "Per-Frame-Eingaben (mouse_x, mouse_y, keys, t) werden jeden Frame als Globals injiziert. Direkt lesen — keine Event-Listener, keine Callbacks.",
+        compare_h2: "bruecke vs. die Alternativen",
+        tbl_feature: "Feature", tbl_rendering: "Rendering", tbl_hotreload: "Hot-Reload",
+        tbl_ai: "KI-Loop integriert", tbl_offline: "Offline / lokal-zuerst", tbl_svg: "SVG-Sprites",
+        tbl_pip: "pip-Pakete", tbl_instant: "Sofort beim Speichern", tbl_manual: "Manuell",
+        tbl_partial: "Teilweise", tbl_providers: "Anbieter", tbl_onebinary: "Eine Binary", tbl_native: "Nativ",
+        start_h2: "In 30 Sekunden startklar",
+        start_step1: "Release für dein OS von GitHub herunterladen",
+        start_step2: "Server starten",
+        start_step3: "Im Browser öffnen",
+        start_path_release: "Option A: Fertige Release (Server-Binary enthalten)",
+        start_step4: "app.py bearbeiten — Canvas aktualisiert sich sofort beim Speichern",
+        start_or_build: "Option B: Aus dem Quellcode bauen",
+        start_build_comment: "benötigt Rust + wasm-pack",
+        start_cargo: "Oder via Cargo installieren",
+        footer_sub: "Echtzeit-Python → WebGPU-Renderer",
+        code_prompt_comment: "Dein Prompt:", code_prompt_text: "Ein Ritter mit Gravitation, Springen und SVG-Sprites",
+        code_generated_comment: "Sofort generiert:",
+        code_module_comment: "Modulebene = läuft einmal",
+    },
+    tr: {
+        nav_features: "Özellikler", nav_start: "Başla",
+        tagline: "Python yaz. Dosyayı kaydet. 60 fps'de render'ı gör — yerel, yapay zeka ile, derleme adımı yok, bulut yok.",
+        btn_download: "↓ İndir", btn_getstarted: "Başla", btn_docs: "📖 API Referansı",
+        btn_download_release: "↓ Release İndir", btn_source: "Kaynak Kodu",
+        features_h2: "Neden bruecke?",
+        f1_title: "Anlık Hot-Reload",        f1_body: "app.py'yi kaydet — canvas milisaniyeler içinde güncellenir. Sayfa yenilemesi yok. Derleyici yok. Her editörle çalışır.",
+        f2_title: "Gerçek WebGPU — 60 fps", f2_body: "Python'un GPU üzerinde MSAA 4× ile çalıştığı özel bir WebGPU pipeline'ı. Donanım hızlandırmalı render.",
+        f3_title: "Yapay Zeka Prompt Döngüsü", f3_body: "Ne istediğini tarif et. Yapay zeka Python yazar. bruecke çalıştırır. Claude, GPT-4o, Gemini (ücretsiz) desteklenir.",
+        f4_title: "Sıfır Kurulum",           f4_body: "Bir binary, bir WASM dosyası, senin app.py'n. npm yok. pip yok. Docker yok. İndirdikten sonra tamamen çevrimdışı çalışır.",
+        f5_title: "Gerçek Python 3",         f5_body: "WASM'a derlenen RustPython — gerçek Python 3 sözdizimi, import math, import random, sınıflar, kapamalar.",
+        f6_title: "SVG Sprite'lar — GPU Keskin", f6_body: "app.py'nin yanına .svg, .png, .jpg koy. SVG'ler tam piksel boyutunda rasterize edilir — her ölçekte keskin.",
+        ai_h3: "Tarif et.\nGör. Hemen.",
+        ai_p1: "Prompt çubuğuna herhangi bir şey yaz. Yapay zeka yalnızca Python kodu çıkarır — markdown yok, açıklama yok, sadece çalışan kod.",
+        ai_p2: "'Build On' ile yapay zeka sahneyi sıfırdan yazmak yerine genişletir. Her oluşturma otomatik olarak versiyon geçmişine kaydedilir.",
+        api_h3: "Tam Python API.\nSıfır Şablon.",
+        api_p1: "Draw builtins, print() gibi her zaman kullanılabilir — import gerekmez. color(), rect(), circle(), image() — sadece çağır.",
+        api_p2: "Frame başına girişler (mouse_x, mouse_y, keys, t) her frame'de global olarak enjekte edilir. Doğrudan oku — event listener yok, callback yok.",
+        compare_h2: "bruecke vs. Alternatifler",
+        tbl_feature: "Özellik", tbl_rendering: "Render", tbl_hotreload: "Hot-Reload",
+        tbl_ai: "Dahili Yapay Zeka", tbl_offline: "Çevrimdışı / Yerel", tbl_svg: "SVG Sprite'lar",
+        tbl_pip: "pip Paketleri", tbl_instant: "Kayıtta Anında", tbl_manual: "Manuel",
+        tbl_partial: "Kısmi", tbl_providers: "sağlayıcı", tbl_onebinary: "Tek Binary", tbl_native: "Yerleşik",
+        start_h2: "30 Saniyede Başla",
+        start_step1: "GitHub'dan işletim sisteminiz için release'i indirin",
+        start_step2: "Sunucuyu başlatın",
+        start_step3: "Tarayıcıda açın",
+        start_path_release: "Seçenek A: Hazır release (server binary dahil)",
+        start_step4: "app.py'yi düzenleyin — canvas kayıtta anında güncellenir",
+        start_or_build: "Seçenek B: Kaynaktan derleyin",
+        start_build_comment: "Rust + wasm-pack gerektirir",
+        start_cargo: "Veya Cargo ile yükleyin",
+        footer_sub: "Gerçek zamanlı Python → WebGPU renderer",
+        code_prompt_comment: "Promptunuz:", code_prompt_text: "Yerçekimi, zıplama ve SVG sprite'larla bir şövalye",
+        code_generated_comment: "Anında oluşturuldu:",
+        code_module_comment: "modül seviyesi = bir kez çalışır",
+    },
+    es: {
+        nav_features: "Características", nav_start: "Inicio",
+        tagline: "Escribe Python. Guarda el archivo. Vélo renderizado a 60 fps — local, con IA, sin paso de compilación, sin nube.",
+        btn_download: "↓ Descargar", btn_getstarted: "Comenzar", btn_docs: "📖 Referencia API",
+        btn_download_release: "↓ Descargar Release", btn_source: "Ver Código",
+        features_h2: "¿Por qué bruecke?",
+        f1_title: "Hot-reload instantáneo",   f1_body: "Guarda app.py — el canvas se actualiza en milisegundos. Sin recarga de página. Sin compilador. Funciona con cualquier editor.",
+        f2_title: "WebGPU real — 60 fps",     f2_body: "Tu Python corre en la GPU con un pipeline WebGPU dedicado con MSAA 4×. Renderizado acelerado por hardware.",
+        f3_title: "Bucle de IA nativo",       f3_body: "Describe lo que quieres. La IA escribe Python. bruecke lo ejecuta. Compatible con Claude, GPT-4o y Gemini (gratis).",
+        f4_title: "Sin configuración",         f4_body: "Un binario, un archivo WASM, tu app.py. Sin npm. Sin pip. Sin Docker. Funciona completamente sin conexión.",
+        f5_title: "Python 3 real",             f5_body: "RustPython compilado a WASM — sintaxis Python 3 real, import math, import random, clases, cierres.",
+        f6_title: "Sprites SVG — nítidos GPU", f6_body: "Coloca cualquier .svg, .png, .jpg junto a app.py. Los SVGs se rasterizan al tamaño exacto de píxel — nítidos a cualquier escala.",
+        ai_h3: "Descríbelo.\nVélo. Ahora mismo.",
+        ai_p1: "Escribe cualquier cosa en la barra de prompt. La IA genera solo código Python — sin markdown, sin explicación. Validado antes de tocar tu archivo.",
+        ai_p2: "Usa 'Build On' para extender tu escena en lugar de reescribirla. Cada generación se guarda automáticamente en el historial de versiones.",
+        api_h3: "API Python completa.\nCero boilerplate.",
+        api_p1: "Los builtins de dibujo están siempre disponibles como print() — sin import. color(), rect(), circle(), image() — solo llámalos.",
+        api_p2: "Las entradas por frame (mouse_x, mouse_y, keys, t) se inyectan como globales cada frame. Léelas directamente — sin listeners, sin callbacks.",
+        compare_h2: "bruecke vs. las alternativas",
+        tbl_feature: "Característica", tbl_rendering: "Renderizado", tbl_hotreload: "Hot-reload",
+        tbl_ai: "Bucle IA integrado", tbl_offline: "Sin conexión / local", tbl_svg: "Sprites SVG",
+        tbl_pip: "Paquetes pip", tbl_instant: "Instantáneo al guardar", tbl_manual: "Manual",
+        tbl_partial: "Parcial", tbl_providers: "proveedores", tbl_onebinary: "Un binario", tbl_native: "Nativo",
+        start_h2: "Listo en 30 segundos",
+        start_step1: "Descarga el release para tu OS desde GitHub",
+        start_step2: "Inicia el servidor",
+        start_step3: "Abre en el navegador",
+        start_path_release: "Opción A: Release precompilada (binario del servidor incluido)",
+        start_step4: "Edita app.py — el canvas se actualiza al guardar",
+        start_or_build: "Opción B: Compilar desde el código fuente",
+        start_build_comment: "requiere Rust + wasm-pack",
+        start_cargo: "O instala con Cargo",
+        footer_sub: "renderer Python → WebGPU en tiempo real",
+        code_prompt_comment: "Tu prompt:", code_prompt_text: "un caballero con gravedad, salto y sprites SVG",
+        code_generated_comment: "Generado al instante:",
+        code_module_comment: "nivel módulo = se ejecuta una vez",
+    },
+    fr: {
+        nav_features: "Fonctionnalités", nav_start: "Démarrer",
+        tagline: "Écris du Python. Sauvegarde le fichier. Vois-le rendu à 60 fps — en local, avec l'IA, sans étape de build, sans cloud.",
+        btn_download: "↓ Télécharger", btn_getstarted: "Commencer", btn_docs: "📖 Référence API",
+        btn_download_release: "↓ Télécharger la release", btn_source: "Voir le code",
+        features_h2: "Pourquoi bruecke ?",
+        f1_title: "Hot-reload instantané",    f1_body: "Sauvegarde app.py — le canvas se met à jour en millisecondes. Pas de rechargement. Pas de compilateur. Compatible avec tout éditeur.",
+        f2_title: "WebGPU réel — 60 fps",     f2_body: "Ton Python tourne sur le GPU via un pipeline WebGPU dédié avec MSAA 4×. Rendu accéléré par le matériel.",
+        f3_title: "Boucle IA native",          f3_body: "Décris ce que tu veux. L'IA écrit du Python. bruecke l'exécute. Compatible avec Claude, GPT-4o et Gemini (gratuit).",
+        f4_title: "Zéro configuration",        f4_body: "Un binaire, un fichier WASM, ton app.py. Pas de npm. Pas de pip. Pas de Docker. Fonctionne entièrement hors ligne.",
+        f5_title: "Python 3 réel",             f5_body: "RustPython compilé en WASM — syntaxe Python 3 réelle, import math, import random, classes, fermetures.",
+        f6_title: "Sprites SVG — nets GPU",    f6_body: "Dépose n'importe quel .svg, .png, .jpg à côté d'app.py. Les SVG sont rastérisés à la taille exacte — nets à toute échelle.",
+        ai_h3: "Décris-le.\nVois-le. Maintenant.",
+        ai_p1: "Tape n'importe quoi dans la barre de prompt. L'IA génère uniquement du code Python — pas de markdown, pas d'explication. Validé avant de toucher à ton fichier.",
+        ai_p2: "Utilise 'Build On' pour étendre ta scène au lieu de la réécrire. Chaque génération est sauvegardée automatiquement dans l'historique.",
+        api_h3: "API Python complète.\nZéro boilerplate.",
+        api_p1: "Les builtins de dessin sont toujours disponibles comme print() — sans import. color(), rect(), circle(), image() — appelle-les directement.",
+        api_p2: "Les entrées par frame (mouse_x, mouse_y, keys, t) sont injectées comme globales chaque frame. Lis-les directement — pas de listeners, pas de callbacks.",
+        compare_h2: "bruecke vs. les alternatives",
+        tbl_feature: "Fonctionnalité", tbl_rendering: "Rendu", tbl_hotreload: "Hot-reload",
+        tbl_ai: "Boucle IA intégrée", tbl_offline: "Hors ligne / local", tbl_svg: "Sprites SVG",
+        tbl_pip: "Paquets pip", tbl_instant: "Instantané à la sauvegarde", tbl_manual: "Manuel",
+        tbl_partial: "Partiel", tbl_providers: "fournisseurs", tbl_onebinary: "Un binaire", tbl_native: "Natif",
+        start_h2: "Prêt en 30 secondes",
+        start_step1: "Télécharge la release pour ton OS depuis GitHub",
+        start_step2: "Lance le serveur",
+        start_step3: "Ouvre dans le navigateur",
+        start_path_release: "Option A : Release prête (binaire du serveur inclus)",
+        start_step4: "Édite app.py — le canvas se met à jour instantanément à la sauvegarde",
+        start_or_build: "Option B : Compiler depuis les sources",
+        start_build_comment: "nécessite Rust + wasm-pack",
+        start_cargo: "Ou installe via Cargo",
+        footer_sub: "renderer Python → WebGPU en temps réel",
+        code_prompt_comment: "Ton prompt :", code_prompt_text: "un chevalier avec gravité, saut et sprites SVG",
+        code_generated_comment: "Généré instantanément :",
+        code_module_comment: "niveau module = s'exécute une fois",
+    },
+    ar: {
+        nav_features: "الميزات", nav_start: "ابدأ",
+        tagline: "اكتب Python. احفظ الملف. شاهده يُعرض بـ 60 fps — محلياً، بالذكاء الاصطناعي، بدون خطوة بناء، بدون سحابة.",
+        btn_download: "↓ تحميل", btn_getstarted: "ابدأ الآن", btn_docs: "📖 مرجع API",
+        btn_download_release: "↓ تحميل الإصدار", btn_source: "عرض الكود",
+        features_h2: "لماذا bruecke؟",
+        f1_title: "إعادة تحميل فورية",        f1_body: "احفظ app.py — يتحدث الـ canvas في ميلي ثانية. بدون إعادة تحميل الصفحة. بدون مترجم. يعمل مع أي محرر.",
+        f2_title: "WebGPU حقيقي — 60 fps",  f2_body: "Python يعمل على GPU عبر pipeline مخصص مع MSAA 4×. رسومات مُعجَّلة بالأجهزة.",
+        f3_title: "حلقة ذكاء اصطناعي أصيلة", f3_body: "صِف ما تريد. يكتب الذكاء الاصطناعي Python. bruecke يُشغّله. يدعم Claude وGPT-4o وGemini (مجاناً).",
+        f4_title: "بدون إعداد",               f4_body: "ملف ثنائي واحد، ملف WASM واحد، app.py الخاص بك. بدون npm. بدون pip. بدون Docker. يعمل بالكامل دون اتصال.",
+        f5_title: "Python 3 حقيقي",           f5_body: "RustPython مُجمَّع إلى WASM — صياغة Python 3 حقيقية، import math، import random، كلاسات، closures.",
+        f6_title: "SVG Sprites — حادة GPU",   f6_body: "ضع أي .svg أو .png أو .jpg بجانب app.py. تُرسم SVG بالحجم الدقيق — حادة في أي مقياس.",
+        ai_h3: "صِفه.\nشاهده. الآن.",
+        ai_p1: "اكتب أي شيء في شريط الـ prompt. يُخرج الذكاء الاصطناعي كود Python فقط — بدون markdown، بدون شرح. يُتحقق منه قبل لمس ملفك.",
+        ai_p2: "استخدم 'Build On' لتوسيع مشهدك بدلاً من إعادة كتابته. كل توليد يُحفظ تلقائياً في سجل الإصدارات.",
+        api_h3: "API Python كاملة.\nبدون boilerplate.",
+        api_p1: "دوال الرسم متاحة دائماً كـ print() — بدون import. color()، rect()، circle()، image() — استدعِها مباشرة.",
+        api_p2: "مدخلات كل frame (mouse_x, mouse_y, keys, t) تُحقن كـ globals في كل frame. اقرأها مباشرة — بدون event listeners، بدون callbacks.",
+        compare_h2: "bruecke مقابل البدائل",
+        tbl_feature: "الميزة", tbl_rendering: "الرسم", tbl_hotreload: "Hot-reload",
+        tbl_ai: "حلقة ذكاء اصطناعي مدمجة", tbl_offline: "بدون إنترنت / محلي", tbl_svg: "SVG Sprites",
+        tbl_pip: "حزم pip", tbl_instant: "فوري عند الحفظ", tbl_manual: "يدوي",
+        tbl_partial: "جزئي", tbl_providers: "مزودين", tbl_onebinary: "ملف واحد", tbl_native: "أصيل",
+        start_h2: "ابدأ في 30 ثانية",
+        start_step1: "حمّل الإصدار المناسب لنظامك من GitHub",
+        start_step2: "شغّل الخادم",
+        start_step3: "افتح في المتصفح",
+        start_path_release: "الخيار أ: إصدار جاهز (ملف الخادم مضمّن)",
+        start_step4: "عدّل app.py — يتحدث الـ canvas فوراً عند الحفظ",
+        start_or_build: "الخيار ب: البناء من المصدر",
+        start_build_comment: "يتطلب Rust + wasm-pack",
+        start_cargo: "أو ثبّت عبر Cargo",
+        footer_sub: "مُحرك Python → WebGPU في الوقت الفعلي",
+        code_prompt_comment: "طلبك:", code_prompt_text: "فارس مع جاذبية وقفز وـ SVG sprites",
+        code_generated_comment: "تم التوليد فوراً:",
+        code_module_comment: "مستوى الوحدة = يُنفَّذ مرة واحدة",
+    },
+    zh: {
+        nav_features: "功能", nav_start: "开始",
+        tagline: "编写 Python。保存文件。以 60 fps 渲染查看 — 本地运行，AI 驱动，无构建步骤，无云端。",
+        btn_download: "↓ 下载", btn_getstarted: "立即开始", btn_docs: "📖 API 参考",
+        btn_download_release: "↓ 下载发行版", btn_source: "查看源码",
+        features_h2: "为什么选择 bruecke？",
+        f1_title: "即时热重载",           f1_body: "保存 app.py — canvas 在毫秒内更新。无需刷新页面，无需编译器，支持任何编辑器。",
+        f2_title: "真正的 WebGPU — 60 fps", f2_body: "Python 通过专用 WebGPU 管线在 GPU 上运行，支持 MSAA 4×。硬件加速渲染。",
+        f3_title: "AI 原生提示循环",       f3_body: "描述你想要的。AI 编写 Python。bruecke 运行它。支持 Claude、GPT-4o、Gemini（免费）。",
+        f4_title: "零配置",               f4_body: "一个二进制文件，一个 WASM 文件，你的 app.py。无 npm，无 pip，无 Docker。下载后完全离线运行。",
+        f5_title: "真正的 Python 3",      f5_body: "编译为 WASM 的 RustPython — 真正的 Python 3 语法，import math，import random，类，闭包。",
+        f6_title: "SVG 精灵 — GPU 清晰",  f6_body: "将任意 .svg、.png、.jpg 放在 app.py 旁边。SVG 以精确像素大小光栅化 — 任何比例下都清晰锐利。",
+        ai_h3: "描述它。\n看见它。就现在。",
+        ai_p1: "在提示栏输入任何内容。AI 只输出 Python 代码 — 无 markdown，无解释，只有可运行的代码。在触碰你的文件之前验证为有效 Python。",
+        ai_p2: "使用 'Build On' 扩展你的场景而不是重写。每次生成都自动保存到版本历史。",
+        api_h3: "完整 Python API。\n零样板代码。",
+        api_p1: "绘图内置函数始终可用，就像 print() — 无需 import。color()、rect()、circle()、image() — 直接调用。",
+        api_p2: "每帧输入（mouse_x、mouse_y、keys、t）每帧作为全局变量注入。直接读取 — 无事件监听器，无回调。",
+        compare_h2: "bruecke 与替代方案对比",
+        tbl_feature: "功能", tbl_rendering: "渲染", tbl_hotreload: "热重载",
+        tbl_ai: "内置 AI 循环", tbl_offline: "离线 / 本地优先", tbl_svg: "SVG 精灵",
+        tbl_pip: "pip 包", tbl_instant: "保存时即时", tbl_manual: "手动",
+        tbl_partial: "部分", tbl_providers: "个提供商", tbl_onebinary: "单一文件", tbl_native: "原生",
+        start_h2: "30 秒内启动",
+        start_step1: "从 GitHub 下载适合你操作系统的发行版",
+        start_step2: "启动服务器",
+        start_step3: "在浏览器中打开",
+        start_path_release: "选项 A：预构建发行版（服务器二进制文件已包含）",
+        start_step4: "编辑 app.py — canvas 在保存时即时更新",
+        start_or_build: "选项 B：从源码构建",
+        start_build_comment: "需要 Rust + wasm-pack",
+        start_cargo: "或通过 Cargo 安装",
+        footer_sub: "实时 Python → WebGPU 渲染器",
+        code_prompt_comment: "你的提示：", code_prompt_text: "一个有重力、跳跃和 SVG 精灵的骑士",
+        code_generated_comment: "即时生成：",
+        code_module_comment: "模块级 = 只运行一次",
+    },
+};
+
+const RTL_LANGS = new Set(['ar']);
+
+function setLang(code) {
+    const lang = T[code] || T['en'];
+    const isRTL = RTL_LANGS.has(code);
+
+    document.documentElement.lang = code;
+    document.documentElement.dir  = isRTL ? 'rtl' : 'ltr';
+
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (lang[key] !== undefined) el.textContent = lang[key];
+    });
+
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('onclick') === `setLang('${code}')`);
+    });
+
+    localStorage.setItem('bruecke_lang', code);
+}
+
+// Restore last language or use browser preference
+(function () {
+    const saved    = localStorage.getItem('bruecke_lang');
+    const browser  = (navigator.language || 'en').slice(0, 2);
+    const preferred = saved || (T[browser] ? browser : 'en');
+    setLang(preferred);
+})();
+</script>
+</body>
+</html>

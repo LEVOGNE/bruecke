@@ -1,0 +1,292 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>bruecke</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#0d0d1a}
+canvas{display:block;touch-action:none;cursor:none}
+
+/* ── AI bar ── */
+#ai-bar{
+  position:fixed;top:0;left:0;right:0;
+  background:rgba(4,4,14,0.95);backdrop-filter:blur(12px);
+  border-bottom:1px solid #0f0f28;padding:9px 14px;
+  display:flex;align-items:center;gap:8px;z-index:500;
+}
+#ai-label{
+  font:11px/1 monospace;color:#1e3a6e;letter-spacing:.12em;
+  text-transform:uppercase;flex-shrink:0;transition:color .2s;
+}
+#ai-input{
+  flex:1;background:#07071a;border:1px solid #141432;border-radius:4px;
+  color:#aac8ff;font:13px/1 monospace;padding:7px 11px;
+  outline:none;transition:border-color .15s;caret-color:#6af;
+}
+#ai-input:focus{border-color:#2040a0;}
+#ai-input::placeholder{color:#1c1c42;}
+
+/* ── Build-on checkbox ── */
+#ai-build-wrap{
+  flex-shrink:0;display:flex;align-items:center;gap:5px;
+  cursor:pointer;user-select:none;
+}
+#ai-build-wrap input[type=checkbox]{
+  appearance:none;width:13px;height:13px;border:1px solid #1a3070;
+  border-radius:2px;background:#07071a;cursor:pointer;
+  position:relative;transition:background .15s,border-color .15s;flex-shrink:0;
+}
+#ai-build-wrap input[type=checkbox]:checked{
+  background:#0a1a40;border-color:#2a50c0;
+}
+#ai-build-wrap input[type=checkbox]:checked::after{
+  content:'✓';position:absolute;top:-1px;left:1px;
+  font:10px/1 monospace;color:#6ab0ff;
+}
+#ai-build-lbl{
+  font:10px/1 monospace;color:#1e3a6e;letter-spacing:.08em;
+  text-transform:uppercase;white-space:nowrap;
+  transition:color .15s;
+}
+#ai-build-wrap:hover #ai-build-lbl{color:#4a70c0;}
+
+#ai-btn{
+  flex-shrink:0;background:#0a1a40;border:1px solid #1a3070;border-radius:4px;
+  color:#6ab0ff;font:12px/1 monospace;padding:7px 16px;cursor:pointer;
+  transition:background .15s,border-color .15s;white-space:nowrap;
+}
+#ai-btn:hover:not(:disabled){background:#122050;border-color:#2a50c0;}
+#ai-btn:disabled{opacity:.35;cursor:default;}
+#ai-status{
+  flex-shrink:0;font:11px/1 monospace;color:#1e2e5e;
+  min-width:50px;text-align:right;
+}
+#ai-hist-btn{
+  flex-shrink:0;background:none;border:1px solid #141432;border-radius:4px;
+  color:#2a3a6a;font:13px/1 monospace;padding:5px 9px;line-height:1;
+  cursor:pointer;transition:color .15s,border-color .15s,background .15s;
+}
+#ai-hist-btn:hover,#ai-hist-btn.active{
+  color:#6ab0ff;border-color:#2040a0;background:#07071a;
+}
+#ai-key-btn{
+  flex-shrink:0;background:none;border:1px solid #141432;border-radius:4px;
+  color:#2a3a6a;font:15px/1 monospace;padding:5px 9px;line-height:1;
+  cursor:pointer;transition:color .15s,border-color .15s,background .15s;
+}
+#ai-key-btn:hover,#ai-key-btn.active{
+  color:#6ab0ff;border-color:#2040a0;background:#07071a;
+}
+
+/* ── Viewport (16:9 letterbox) ── */
+#viewport{
+  position:fixed;top:48px;left:0;right:0;bottom:0;
+  background:#000;display:flex;align-items:center;justify-content:center;
+}
+
+/* ── History panel ── */
+#ahp{
+  display:none;flex-direction:column;
+  position:fixed;top:48px;left:14px;width:340px;max-height:55vh;
+  background:#060614;border:1px solid #181838;border-radius:10px;
+  box-shadow:0 12px 40px rgba(0,0,80,.65);z-index:600;
+  font:12px/1.5 monospace;color:#7888bb;overflow:hidden;
+}
+#ahp.open{display:flex;}
+#ahp-head{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:11px 14px 10px;border-bottom:1px solid #0f0f28;flex-shrink:0;
+}
+#ahp-title{color:#aac8ff;font-size:13px;font-weight:bold;letter-spacing:.04em;}
+#ahp-close{
+  background:none;border:none;color:#2a3a6a;font:16px/1 monospace;
+  cursor:pointer;padding:2px 5px;transition:color .15s;
+}
+#ahp-close:hover{color:#ff5566;}
+#ahp-list{overflow-y:auto;flex:1;}
+#ahp-empty{
+  padding:20px 14px;color:#1e2e5e;font-size:11px;text-align:center;
+}
+.ahp-entry{
+  padding:10px 14px;border-bottom:1px solid #0a0a20;cursor:pointer;
+  transition:background .12s;display:flex;flex-direction:column;gap:3px;
+}
+.ahp-entry:hover{background:#08081e;}
+.ahp-entry:last-child{border-bottom:none;}
+.ahp-entry-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+}
+.ahp-time{color:#4a6090;font-size:10px;}
+.ahp-lines{color:#1e3a6e;font-size:10px;}
+.ahp-preview{
+  color:#384870;font-size:10px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.ahp-restore{
+  font-size:9px;color:#0a1830;text-transform:uppercase;letter-spacing:.08em;
+  margin-top:1px;transition:color .15s;
+}
+.ahp-entry:hover .ahp-restore{color:#2a50c0;}
+
+/* ── Settings panel ── */
+#asp{
+  display:none;position:fixed;top:48px;right:14px;width:310px;
+  background:#060614;border:1px solid #181838;border-radius:10px;
+  box-shadow:0 12px 40px rgba(0,0,80,.65);z-index:600;
+  font:12px/1.5 monospace;color:#7888bb;overflow:hidden;
+}
+#asp.open{display:block;}
+#asp-head{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 14px 11px;border-bottom:1px solid #0f0f28;
+}
+#asp-title{color:#aac8ff;font-size:13px;font-weight:bold;letter-spacing:.04em;}
+#asp-close{
+  background:none;border:none;color:#2a3a6a;font:16px/1 monospace;
+  cursor:pointer;padding:2px 5px;transition:color .15s;
+}
+#asp-close:hover{color:#ff5566;}
+#asp-tabs{display:flex;border-bottom:1px solid #0f0f28;}
+.asp-tab{
+  flex:1;background:none;border:none;border-bottom:2px solid transparent;
+  color:#2a3a6a;font:11px/1 monospace;padding:9px 4px;
+  cursor:pointer;letter-spacing:.06em;transition:color .15s,background .15s;
+}
+.asp-tab:hover{color:#6ab0ff;}
+.asp-tab.active{color:#6ab0ff;border-bottom-color:#2a50c0;background:#08081e;}
+.asp-section{padding:14px;display:none;}
+.asp-section.active{display:block;}
+.asp-lbl{
+  display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:#1e2e5e;margin-bottom:5px;margin-top:12px;
+}
+.asp-lbl:first-child{margin-top:0;}
+.asp-inp,.asp-sel{
+  width:100%;background:#07071a;border:1px solid #141432;border-radius:4px;
+  color:#aac8ff;font:12px/1 monospace;padding:7px 9px;
+  outline:none;transition:border-color .15s;
+}
+.asp-inp:focus,.asp-sel:focus{border-color:#2040a0;}
+.asp-sel option{background:#07071a;}
+.asp-key-row{display:flex;gap:6px;align-items:center;}
+.asp-key-row .asp-inp{flex:1;}
+.asp-eye{
+  background:none;border:1px solid #141432;border-radius:4px;
+  color:#2a3a6a;font:13px/1;padding:6px 8px;
+  cursor:pointer;flex-shrink:0;transition:color .15s,border-color .15s;
+}
+.asp-eye:hover{color:#6ab0ff;border-color:#2040a0;}
+.asp-link{
+  display:inline-block;margin-top:9px;font-size:10px;
+  color:#1a2850;text-decoration:none;transition:color .15s;
+}
+.asp-link:hover{color:#4a80ff;}
+.asp-free{
+  font-size:9px;color:#1a5030;background:#07150e;
+  border:1px solid #0a2818;border-radius:3px;padding:1px 5px;
+  letter-spacing:.05em;text-transform:uppercase;vertical-align:middle;margin-left:4px;
+}
+#asp-footer{padding:0 14px 14px;display:flex;align-items:center;gap:10px;}
+#asp-save{
+  flex:1;background:#0a1a40;border:1px solid #1a3070;border-radius:4px;
+  color:#6ab0ff;font:12px/1 monospace;padding:8px;cursor:pointer;
+  transition:background .15s,border-color .15s;
+}
+#asp-save:hover{background:#122050;border-color:#2a50c0;}
+#asp-saved{font-size:11px;color:#206040;opacity:0;transition:opacity .3s;}
+#asp-saved.show{opacity:1;}
+</style>
+</head><body>
+<div id="viewport">
+<canvas id="c"></canvas>
+</div>
+
+<!-- ── History Panel ── -->
+<div id="ahp">
+  <div id="ahp-head">
+    <span id="ahp-title">📜 History</span>
+    <button id="ahp-close">✕</button>
+  </div>
+  <div id="ahp-list">
+    <div id="ahp-empty">No history yet — generate something first.</div>
+  </div>
+</div>
+
+<!-- ── AI Settings Panel ── -->
+<div id="asp">
+  <div id="asp-head">
+    <span id="asp-title">🤖 AI Provider &amp; Key</span>
+    <button id="asp-close">✕</button>
+  </div>
+  <div id="asp-tabs">
+    <button class="asp-tab active" data-p="anthropic">Anthropic</button>
+    <button class="asp-tab"        data-p="openai">OpenAI</button>
+    <button class="asp-tab"        data-p="gemini">Gemini</button>
+  </div>
+
+  <div class="asp-section active" data-p="anthropic">
+    <span class="asp-lbl">API Key</span>
+    <div class="asp-key-row">
+      <input class="asp-inp" id="key-anthropic" type="password" placeholder="sk-ant-...">
+      <button class="asp-eye" data-for="key-anthropic">👁</button>
+    </div>
+    <span class="asp-lbl">Model</span>
+    <select class="asp-sel" id="model-anthropic">
+      <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 — fast &amp; cheap</option>
+      <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — smarter</option>
+    </select>
+    <a class="asp-link" href="https://console.anthropic.com" target="_blank">↗ console.anthropic.com → API Keys</a>
+  </div>
+
+  <div class="asp-section" data-p="openai">
+    <span class="asp-lbl">API Key</span>
+    <div class="asp-key-row">
+      <input class="asp-inp" id="key-openai" type="password" placeholder="sk-...">
+      <button class="asp-eye" data-for="key-openai">👁</button>
+    </div>
+    <span class="asp-lbl">Model</span>
+    <select class="asp-sel" id="model-openai">
+      <option value="gpt-4o-mini">GPT-4o mini — fast &amp; cheap</option>
+      <option value="gpt-4o">GPT-4o — smarter</option>
+    </select>
+    <a class="asp-link" href="https://platform.openai.com/api-keys" target="_blank">↗ platform.openai.com → API Keys</a>
+  </div>
+
+  <div class="asp-section" data-p="gemini">
+    <span class="asp-lbl">API Key <span class="asp-free">free tier</span></span>
+    <div class="asp-key-row">
+      <input class="asp-inp" id="key-gemini" type="password" placeholder="AIza...">
+      <button class="asp-eye" data-for="key-gemini">👁</button>
+    </div>
+    <span class="asp-lbl">Model</span>
+    <select class="asp-sel" id="model-gemini">
+      <option value="gemini-2.0-flash">Gemini 2.0 Flash — free tier!</option>
+      <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+      <option value="gemini-1.5-pro">Gemini 1.5 Pro — smarter</option>
+    </select>
+    <a class="asp-link" href="https://aistudio.google.com/apikey" target="_blank">↗ aistudio.google.com → FREE Key</a>
+  </div>
+
+  <div id="asp-footer">
+    <button id="asp-save">Save &amp; Use</button>
+    <span id="asp-saved">✓ saved</span>
+  </div>
+</div>
+
+<!-- ── AI bar ── -->
+<div id="ai-bar">
+  <span id="ai-label">AI</span>
+  <input id="ai-input" type="text"
+    placeholder="describe what to draw — press Enter or Generate"
+    autocomplete="off" spellcheck="false">
+  <label id="ai-build-wrap" title="Build on current code instead of rewriting from scratch">
+    <input type="checkbox" id="ai-build">
+    <span id="ai-build-lbl">build on</span>
+  </label>
+  <button id="ai-btn">Generate</button>
+  <div id="ai-status"></div>
+  <button id="ai-hist-btn" title="Version history">📜</button>
+  <button id="ai-key-btn" title="AI Provider &amp; Key Settings">🔑</button>
+</div>
+<script>/* bruecke entry */</script>
+</body></html>

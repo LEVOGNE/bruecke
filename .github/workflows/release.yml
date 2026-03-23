@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install wasm-pack
+      - run: wasm-pack build --target web --release
+      - run: mkdir -p assets && cp pkg/bruecke_bg.wasm assets/bruecke_bg.wasm
+      - run: cargo build --bin server --release
+      - run: |
+          mkdir -p pkg_out
+          cp target/release/server pkg_out/server
+          cp pkg/bruecke_bg.wasm pkg_out/bruecke_bg.wasm
+          cp app.py pkg_out/app.py
+          cp log.py pkg_out/log.py
+          printf 'bruecke\n=======\nStart:  ./server\nOpen:   http://127.0.0.1:7777\nEdit app.py to update the canvas instantly.\n' > pkg_out/README.txt
+          chmod +x pkg_out/server
+          cd pkg_out && zip -r ../bruecke-macos.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bruecke-macos
+          path: bruecke-macos.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get install -y musl-tools
+      - run: cargo install wasm-pack
+      - run: wasm-pack build --target web --release
+      - run: mkdir -p assets && cp pkg/bruecke_bg.wasm assets/bruecke_bg.wasm
+      - run: cargo build --bin server --release --target x86_64-unknown-linux-musl
+      - run: |
+          mkdir -p pkg_out
+          cp target/x86_64-unknown-linux-musl/release/server pkg_out/server
+          cp pkg/bruecke_bg.wasm pkg_out/bruecke_bg.wasm
+          cp app.py pkg_out/app.py
+          cp log.py pkg_out/log.py
+          printf 'bruecke\n=======\nStart:  ./server\nOpen:   http://127.0.0.1:7777\nEdit app.py to update the canvas instantly.\n' > pkg_out/README.txt
+          chmod +x pkg_out/server
+          cd pkg_out && zip -r ../bruecke-linux.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bruecke-linux
+          path: bruecke-linux.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install wasm-pack
+      - run: wasm-pack build --target web --release
+      - run: mkdir assets && copy pkg\bruecke_bg.wasm assets\bruecke_bg.wasm
+        shell: cmd
+      - run: cargo build --bin server --release
+      - run: |
+          New-Item -ItemType Directory -Force pkg_out
+          Copy-Item target\release\server.exe pkg_out\server.exe
+          Copy-Item pkg\bruecke_bg.wasm pkg_out\bruecke_bg.wasm
+          Copy-Item app.py pkg_out\app.py
+          Copy-Item log.py pkg_out\log.py
+          Set-Content pkg_out\README.txt "bruecke`n=======`nStart:  server.exe`nOpen:   http://127.0.0.1:7777`nEdit app.py to update the canvas instantly."
+          Compress-Archive -Path pkg_out\* -DestinationPath bruecke-windows.zip
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bruecke-windows
+          path: bruecke-windows.zip
+
+  release:
+    needs: [build-macos, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: zips/
+          merge-multiple: true
+      - run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "bruecke ${{ github.ref_name }}" \
+            --notes "Download the zip for your OS, unzip, and run the server binary." \
+            zips/bruecke-macos.zip \
+            zips/bruecke-linux.zip \
+            zips/bruecke-windows.zip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
